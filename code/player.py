@@ -1,5 +1,5 @@
 import pygame
-from math import pi, copysign, sqrt
+from math import sin, cos, pi, copysign, sqrt, radians
 from settings import DELTA_TIME, GRAVITY
 import shapely.geometry
 
@@ -12,15 +12,17 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(midbottom=pos)
         self.radius = self.rect.width / 2
         self.x, self.y = self.rect.center
-        self.velocity = pygame.Vector2()
 
+        self.velocity = pygame.Vector2()
         self.display_surf = pygame.display.get_surface()
         self.obstacle_sprites = obstacle_sprites
 
         self.speed = 0.3
+        self.default_jumps = 1
 
         self.rotation = 0
         self.rotation_vel = 0
+        self.n_jumps = self.default_jumps
 
     def _move(self):
         # collision logic for x and y independently
@@ -47,7 +49,7 @@ class Player(pygame.sprite.Sprite):
                     for line in sprite.hitbox_list:
                         if player_hitbox.intersects(line.hitbox):
                             # find score based on how much the angle of velocity opposes the line (smaller = better)
-                            score = 1 - abs(self.velocity.angle_to(line.normal_vect)) / 180
+                            score = abs(1 - abs(self.velocity.angle_to(line.normal_vect)) / 180)
                             if score < min_score:
                                 min_score = score
                                 min_score_data = (sprite, line)
@@ -61,7 +63,6 @@ class Player(pygame.sprite.Sprite):
 
             min_score = None
             min_score_data = ()  # (sprite, line)
-            min_angle = None
             for sprite in self.obstacle_sprites:
                 if player_hitbox.intersects(sprite.hitbox):
                     self._exit_tile(sprite, direction)
@@ -69,23 +70,14 @@ class Player(pygame.sprite.Sprite):
                         if player_hitbox.intersects(line.hitbox):
 
                             # find score based on how much the angle of velocity opposes the line (smaller = better)
-                            score = abs(1 + self.velocity.angle_to(line.normal_vect) / 180)
+                            score = abs(1 - abs(self.velocity.angle_to(line.normal_vect)) / 180)
                             if min_score is None or score < min_score:
                                 min_score = score
                                 min_score_data = (sprite, line)
 
-                            # find minimum angle for roll logic
-                            # format angle so >180 -> <0
-                            angle = line.angle - 360 if line.angle > 180 else line.angle
-                            if min_angle is None or abs(angle) < min_angle:
-                                min_angle = angle
-
             # collision logic with most suitable line object
             if min_score_data:
                 self._bounce(*min_score_data)
-
-            if min_angle is not None:
-                print(min_angle)
 
     def _exit_tile(self, sprite, direction):
         # move player out of tile
@@ -125,8 +117,12 @@ class Player(pygame.sprite.Sprite):
             self.velocity = self.velocity.reflect(line.normal_vect)
 
             # apply bounciness
-            self.velocity.x *= 1 - (1 - sprite.bounciness) * abs(line.normal_vect.x)
-            self.velocity.y *= 1 - (1 - sprite.bounciness) * abs(line.normal_vect.x)
+            # find the magnitude of the vector that is a component of the velocity and goes along the normal vector of the line
+            magnitude = self.velocity.dot(line.normal_vect) / line.normal_vect.magnitude()
+
+            if magnitude > 1:
+                self.velocity.x *= 1 - (1 - sprite.bounciness) * abs(line.normal_vect.x)
+                self.velocity.y *= 1 - (1 - sprite.bounciness) * abs(line.normal_vect.x)
 
     def _get_rotation_vel(self):
         velocity = self.velocity.magnitude()
@@ -151,6 +147,9 @@ class Player(pygame.sprite.Sprite):
         rotated_image_rect = rotated_image.get_rect(center=rotated_image_center)
         self.display_surf.blit(rotated_image, rotated_image_rect)
 
+    def reset_jumps(self):
+        self.n_jumps = self.default_jumps
+
     def shoot(self):
         # Set velocity by mouse position
         mouse_x, mouse_y = pygame.mouse.get_pos()
@@ -161,5 +160,6 @@ class Player(pygame.sprite.Sprite):
         self.velocity = pygame.Vector2(dx, dy)
 
     def update(self):
+        print('=')
         self._draw()
         self._move()
