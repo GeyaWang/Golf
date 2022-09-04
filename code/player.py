@@ -43,9 +43,7 @@ class Player(pygame.sprite.Sprite):
             min_score_data = ()  # (sprite, line)
             for sprite in self.obstacle_sprites:
                 if player_hitbox.intersects(sprite.hitbox):
-
                     self._exit_tile(sprite, direction)
-
                     for line in sprite.hitbox_list:
                         if player_hitbox.intersects(line.hitbox):
                             # find score based on how much the angle of velocity opposes the line (smaller = better)
@@ -61,25 +59,33 @@ class Player(pygame.sprite.Sprite):
         else:  # vertical
             player_hitbox = shapely.geometry.Point(self.x, self.y).buffer(self.radius)
 
-            min_score = 999
+            min_score = None
             min_score_data = ()  # (sprite, line)
-            min_angle = 999  # find minimum angle for roll logic
+            min_angle = None
             for sprite in self.obstacle_sprites:
                 if player_hitbox.intersects(sprite.hitbox):
-
                     self._exit_tile(sprite, direction)
-
                     for line in sprite.hitbox_list:
                         if player_hitbox.intersects(line.hitbox):
+
                             # find score based on how much the angle of velocity opposes the line (smaller = better)
                             score = abs(1 + self.velocity.angle_to(line.normal_vect) / 180)
-                            if score < min_score:
+                            if min_score is None or score < min_score:
                                 min_score = score
                                 min_score_data = (sprite, line)
+
+                            # find minimum angle for roll logic
+                            # format angle so >180 -> <0
+                            angle = line.angle - 360 if line.angle > 180 else line.angle
+                            if abs(min_angle) is None or angle < min_angle:
+                                min_angle = angle
 
             # collision logic with most suitable line object
             if min_score_data:
                 self._bounce(*min_score_data)
+
+            if min_angle is not None:
+                print(min_angle)
 
     def _exit_tile(self, sprite, direction):
         # move player out of tile
