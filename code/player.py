@@ -77,7 +77,7 @@ class Player(pygame.sprite.Sprite):
                             # find minimum angle for roll logic
                             # format angle so >180 -> <0
                             angle = line.angle - 360 if line.angle > 180 else line.angle
-                            if abs(min_angle) is None or angle < min_angle:
+                            if min_angle is None or abs(angle) < min_angle:
                                 min_angle = angle
 
             # collision logic with most suitable line object
