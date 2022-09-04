@@ -1,25 +1,29 @@
 import pygame
-from math import sin, cos, pi, copysign, sqrt, radians
+from math import pi, copysign, sqrt
 from settings import DELTA_TIME, GRAVITY
 import shapely.geometry
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, pos, obstacle_sprites):
-        super().__init__()
+    def __init__(self, pos, group, obstacle_sprites, visible_sprites):
+        super().__init__(group)
 
         self.image = pygame.image.load('../graphics/player/ball.png').convert_alpha()
         self.rect = self.image.get_rect(midbottom=pos)
         self.radius = self.rect.width / 2
         self.x, self.y = self.rect.center
+        self.offset = pygame.Vector2()
+
+        self.obstacle_sprites = obstacle_sprites
+        self.visible_sprite = visible_sprites
 
         self.velocity = pygame.Vector2()
         self.display_surf = pygame.display.get_surface()
-        self.obstacle_sprites = obstacle_sprites
 
         self.speed = 0.3
-        self.default_jumps = 1
+        self.default_jumps = 2
 
+        self.can_jump = True
         self.rotation = 0
         self.rotation_vel = 0
         self.n_jumps = self.default_jumps
@@ -68,7 +72,6 @@ class Player(pygame.sprite.Sprite):
                     self._exit_tile(sprite, direction)
                     for line in sprite.hitbox_list:
                         if player_hitbox.intersects(line.hitbox):
-
                             # find score based on how much the angle of velocity opposes the line (smaller = better)
                             score = abs(1 - abs(self.velocity.angle_to(line.normal_vect)) / 180)
                             if min_score is None or score < min_score:
@@ -85,33 +88,42 @@ class Player(pygame.sprite.Sprite):
         if direction == 'horizontal':
             player_hitbox = shapely.geometry.Point(self.x, self.y).buffer(self.radius)
             if self.velocity.magnitude() != 0:
-                vel = self.velocity.normalize()
+                if self.velocity.x > 0:
+                    x = 0.1
+                else:
+                    x = -0.1
 
                 i = 0  # iteration limit
                 while player_hitbox.intersects(sprite.hitbox):
                     i += 1
                     if i > 1000:
                         break
-                    self.x -= vel.x
+                    self.x -= x
                     player_hitbox = shapely.geometry.Point(self.x, self.y).buffer(self.radius)
 
         else:  # vertical
             player_hitbox = shapely.geometry.Point(self.x, self.y).buffer(self.radius)
             if self.velocity.magnitude() != 0:
-                vel = self.velocity.normalize()
+                if self.velocity.y > 0:
+                    y = 0.1
+                else:
+                    y = -0.1
 
                 i = 0  # iteration limit
                 while player_hitbox.intersects(sprite.hitbox):
                     i += 1
                     if i > 1000:
                         break
-                    self.y -= vel.y
+                    self.y -= y
                     player_hitbox = shapely.geometry.Point(self.x, self.y).buffer(self.radius)
 
     def _bounce(self, sprite, line):
+        self.can_jump = True
+
         # stick if flat platform
         if line.angle == 0:
             self.velocity.update(0, 0)
+            self.reset_jumps()
         else:
             # bounce
             self.velocity = self.velocity.reflect(line.normal_vect)
@@ -120,7 +132,7 @@ class Player(pygame.sprite.Sprite):
             # find the magnitude of the vector that is a component of the velocity and goes along the normal vector of the line
             magnitude = self.velocity.dot(line.normal_vect) / line.normal_vect.magnitude()
 
-            if magnitude > 1:
+            if magnitude > 1:  # threshold
                 self.velocity.x *= 1 - (1 - sprite.bounciness) * abs(line.normal_vect.x)
                 self.velocity.y *= 1 - (1 - sprite.bounciness) * abs(line.normal_vect.x)
 
@@ -131,18 +143,14 @@ class Player(pygame.sprite.Sprite):
         else:
             self.rotation_vel = 0
 
-    def _input(self):
-        pass
-
     def _draw(self):
         # Rotate image and display it
-        pos = self.rect.center
         originPos = self.image.get_size()[0] / 2, self.image.get_size()[1] / 2
 
-        image_rect = self.image.get_rect(topleft=(pos[0] - originPos[0], pos[1] - originPos[1]))
-        offset_center_to_pivot = pygame.Vector2(pos) - image_rect.center
+        image_rect = self.image.get_rect(topleft=(self.x - originPos[0], self.y - originPos[1]))
+        offset_center_to_pivot = pygame.Vector2(self.x, self.y) - image_rect.center
         rotated_offset = offset_center_to_pivot.rotate(-self.rotation)
-        rotated_image_center = (pos[0] - rotated_offset.x, pos[1] - rotated_offset.y)
+        rotated_image_center = (self.x - rotated_offset.x, self.y - rotated_offset.y)
         rotated_image = pygame.transform.rotate(self.image, self.rotation)
         rotated_image_rect = rotated_image.get_rect(center=rotated_image_center)
         self.display_surf.blit(rotated_image, rotated_image_rect)
@@ -151,15 +159,16 @@ class Player(pygame.sprite.Sprite):
         self.n_jumps = self.default_jumps
 
     def shoot(self):
+        self.can_jump = False
+
         # Set velocity by mouse position
         mouse_x, mouse_y = pygame.mouse.get_pos()
-        dx = (mouse_x - self.rect.centerx)
+        dx = (mouse_x - self.offset.x)
         dx = sqrt(abs(dx)) * copysign(1, dx)
-        dy = (mouse_y - self.rect.centery)
+        dy = (mouse_y - self.offset.y)
         dy = sqrt(abs(dy)) * copysign(1, dy)
         self.velocity = pygame.Vector2(dx, dy)
 
     def update(self):
-        print('=')
-        self._draw()
+        # self._draw()
         self._move()

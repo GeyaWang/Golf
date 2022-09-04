@@ -1,5 +1,5 @@
 import pygame
-from math import pi, sin, cos, sqrt, acos, atan, atan2, degrees
+from math import pi, sin, cos, sqrt, acos, atan, degrees
 import shapely.geometry
 from settings import TILE_SIZE
 from collections import namedtuple
