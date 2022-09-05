@@ -1,6 +1,12 @@
 from helper import import_csv_layout
 from dataclasses import dataclass
-import pygame
+from enum import Enum
+
+
+class Map(Enum):
+    collision = 0
+    platform = 1
+    player = 2
 
 
 @dataclass
@@ -11,9 +17,9 @@ class Data:
 
 Level0 = Data(
     {
-        'collision': import_csv_layout('../graphics/level_0/tilemap/collision_map.csv'),
-        'platform': import_csv_layout('../graphics/level_0/tilemap/platform_map.csv'),
-        'spawn': import_csv_layout('../graphics/level_0/tilemap/spawn_map.csv')
+        Map.collision: import_csv_layout('../graphics/level_0/tilemap/collision_map.csv'),
+        Map.platform: import_csv_layout('../graphics/level_0/tilemap/platform_map.csv'),
+        Map.player: import_csv_layout('../graphics/level_0/tilemap/player_spawn_map.csv')
     },
     (
         '../graphics/level_0/images/background_0.png',

@@ -1,9 +1,9 @@
 import pygame
-from tile import Tile, TileType
+from tile import Tile, Platform, TileType
 from player import Player
 from cursor import Cursor
-from settings import *
-from game_data import LevelData
+from settings import WIDTH, HEIGHT, TILE_SIZE
+from game_data import LevelData, Map
 
 
 class Level:
@@ -17,9 +17,17 @@ class Level:
 
         self._create_map()
         self.cursor = Cursor(self.player)
-        self._remove_overlap_hitbox()
 
         self.background_surfs = [pygame.transform.scale(pygame.image.load(path).convert_alpha(), (WIDTH, HEIGHT)) for path in LevelData[0].backgrounds]
+
+    def _spawn_sprite(self, style, pos):
+        match style:
+            case Map.collision:
+                Tile(pos, [self.obstacle_sprites], TileType.block, style)
+            case Map.platform:
+                Platform(pos, [self.obstacle_sprites], style)
+            case Map.player:
+                self.player = Player(pos, [self.visible_sprites], self.obstacle_sprites, self.visible_sprites)
 
     def _create_map(self):
         for style, layout in LevelData[0].map.items():
@@ -28,29 +36,7 @@ class Level:
                     if col != '-1':
                         x = col_index * TILE_SIZE
                         y = row_index * TILE_SIZE
-                        if style == 'collision':
-                            Tile((x, y), [self.obstacle_sprites], TileType.block)
-                        elif style == 'platform':
-                            pass
-                            # Tile((x, y), [self.obstacle_sprites], TileType.block)
-                        elif style == 'spawn':
-                            self.player = Player((x, y + TILE_SIZE), [self.visible_sprites], self.obstacle_sprites, self.visible_sprites)
-
-    def _remove_overlap_hitbox(self):
-        for a in self.obstacle_sprites:
-            for b in self.obstacle_sprites:
-                if a is not b:
-                    list_a = a.hitbox_list.copy()
-                    list_b = b.hitbox_list.copy()
-
-                    for line_a in list_a:
-                        for line_b in list_b:
-                            if set(line_a.coords) == set(line_b.coords):
-                                a.hitbox_list.remove(line_a)
-                                del line_a
-                                b.hitbox_list.remove(line_b)
-                                del line_b
-                                break
+                        self._spawn_sprite(style, (x, y))
 
     def run(self):
         # background

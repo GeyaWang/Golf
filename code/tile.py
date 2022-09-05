@@ -35,57 +35,55 @@ class LineHitbox:
 
 
 Point = namedtuple('Point', 'x, y')
-TileData = namedtuple('TileData', 'sprite, rel_vertices, center')
+TileData = namedtuple('TileData', 'rel_vertices, center')
 
 
 @dataclass
 class TileType:
     # No convex angles
     block = TileData(
-        '../graphics/test/block.png',
         (Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1)),
         Point(0.5, 0.5)
     )
+    platform = TileData(
+        (Point(0, 0), Point(1, 0)),
+        (Point(0.5, 0))
+    )
     slope0 = TileData(
-        '../graphics/test/slope0.png',
         (Point(0, 0), Point(1, 1), Point(0, 1)),
         Point(0.5, 0.5)
     )
     slope1 = TileData(
-        '../graphics/test/slope1.png',
         (Point(0, 0), Point(1, 0), Point(0, 1)),
         Point(0.5, 0.5)
     )
     slope2 = TileData(
-        '../graphics/test/slope2.png',
         (Point(0, 0), Point(1, 0), Point(1, 1)),
         Point(0.5, 0.5)
     )
     slope3 = TileData(
-        '../graphics/test/slope3.png',
         (Point(1, 0), Point(1, 1), Point(0, 1)),
         Point(0.5, 0.5)
     )
 
 
 class Tile(pygame.sprite.Sprite):
-    def __init__(self, pos, group, tile_data):
+    def __init__(self, pos, group, tile_data, tile_type):
         super().__init__(group)
 
-        self.image = pygame.image.load(tile_data.sprite).convert_alpha()
-        self.rect = self.image.get_rect(topleft=pos)
+        self.rect = pygame.Rect(pos[0], pos[1], TILE_SIZE, TILE_SIZE)
+        self.pos = pos
 
-        self.real_coord_list = [(i.x * TILE_SIZE + pos[0], i.y * TILE_SIZE + pos[1]) for i in tile_data.rel_vertices]
-        self.hitbox = shapely.geometry.Polygon(self.real_coord_list)
-
+        self.type = tile_type
         self.rel_vertices = tile_data.rel_vertices
         self.center = tile_data.center
+        self.real_coord_list = [(i.x * TILE_SIZE + pos[0], i.y * TILE_SIZE + pos[1]) for i in self.rel_vertices]
+
+        self._get_line_data_list()
+        self._get_hitboxes()
 
         self.friction = 0.1
         self.bounciness = 0.3
-
-        self._get_line_data_list()
-        self.hitbox_list = [LineHitbox(i[0], i[1], pos) for i in self.line_data_list]
 
     def _get_line_data_list(self):
         # get all outside connecting lines
@@ -133,3 +131,18 @@ class Tile(pygame.sprite.Sprite):
 
             # add to self.line_data_list
             self.line_data_list.append([lines, angle])
+
+    def _get_hitboxes(self):
+        self.hitbox = shapely.geometry.Polygon(self.real_coord_list)
+        self.hitbox_list = [LineHitbox(i[0], i[1], self.pos) for i in self.line_data_list]
+
+
+class Platform(Tile):
+    def __init__(self, pos, group, tile_type):
+        super().__init__(pos, group, TileType.platform, tile_type)
+
+    def _get_line_data_list(self):
+        self.line_data_list = (self.rel_vertices[0], self.rel_vertices[1])
+
+    def _get_hitboxes(self):
+        self.line = LineHitbox((self.line_data_list[0], self.line_data_list[1]), 0, self.pos)

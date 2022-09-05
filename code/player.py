@@ -1,7 +1,14 @@
 import pygame
 from math import pi, copysign, sqrt
 from settings import DELTA_TIME, GRAVITY
+from game_data import Map
 import shapely.geometry
+from enum import Enum
+
+
+class Direction(Enum):
+    HORIZONTAL = 0
+    VERTICAL = 1
 
 
 class Player(pygame.sprite.Sprite):
@@ -33,59 +40,49 @@ class Player(pygame.sprite.Sprite):
         self.velocity.y += GRAVITY * DELTA_TIME
         self.y += self.velocity.y
         self.rect.centery = self.y
-        self._collision('vertical')
+        self._collision(Direction.VERTICAL)
 
         self.x += self.velocity.x
         self.rect.centerx = self.x
-        self._collision('horizontal')
+        self._collision(Direction.HORIZONTAL)
 
         self.rect.center = self.x, self.y
 
     def _collision(self, direction):
-        if direction == 'horizontal':
-            player_hitbox = shapely.geometry.Point(self.x, self.y).buffer(self.radius)
+        player_hitbox = shapely.geometry.Point(self.x, self.y).buffer(self.radius)
 
-            min_score = 99
-            min_score_data = ()  # (sprite, line)
-            for sprite in self.obstacle_sprites:
-                if player_hitbox.intersects(sprite.hitbox):
-                    self._exit_tile(sprite, direction)
-                    for line in sprite.hitbox_list:
-                        if player_hitbox.intersects(line.hitbox):
-                            # find score based on how much the angle of velocity opposes the line (smaller = better)
-                            score = abs(1 - abs(self.velocity.angle_to(line.normal_vect)) / 180)
-                            if score < min_score:
-                                min_score = score
-                                min_score_data = (sprite, line)
+        min_score = None
+        min_score_data = ()  # (sprite, line)
+        for sprite in self.obstacle_sprites:
+            match sprite.type:
+                case Map.platform:
+                    if self.velocity.y > 0 and player_hitbox.intersects(sprite.line.hitbox) and direction == Direction.VERTICAL:
+                        if self.y + self.radius >= sprite.rect.top:
+                            self._exit_tile(sprite.line, direction)
+                        # find score based on how much the angle of velocity opposes the line (smaller = better)
+                        score = abs(1 - abs(self.velocity.angle_to(sprite.line.normal_vect)) / 180)
+                        if min_score is None or score < min_score:
+                            min_score = score
+                            min_score_data = (sprite, sprite.line)
+                case _:
+                    if player_hitbox.intersects(sprite.hitbox):
+                        self._exit_tile(sprite, direction)
+                        for line in sprite.hitbox_list:
+                            if player_hitbox.intersects(line.hitbox):
+                                # find score based on how much the angle of velocity opposes the line (smaller = better)
+                                score = abs(1 - abs(self.velocity.angle_to(line.normal_vect)) / 180)
+                                if min_score is None or score < min_score:
+                                    min_score = score
+                                    min_score_data = (sprite, line)
 
-            # collision logic with most suitable line object
-            if min_score_data:
-                self._bounce(*min_score_data)
-
-        else:  # vertical
-            player_hitbox = shapely.geometry.Point(self.x, self.y).buffer(self.radius)
-
-            min_score = None
-            min_score_data = ()  # (sprite, line)
-            for sprite in self.obstacle_sprites:
-                if player_hitbox.intersects(sprite.hitbox):
-                    self._exit_tile(sprite, direction)
-                    for line in sprite.hitbox_list:
-                        if player_hitbox.intersects(line.hitbox):
-                            # find score based on how much the angle of velocity opposes the line (smaller = better)
-                            score = abs(1 - abs(self.velocity.angle_to(line.normal_vect)) / 180)
-                            if min_score is None or score < min_score:
-                                min_score = score
-                                min_score_data = (sprite, line)
-
-            # collision logic with most suitable line object
-            if min_score_data:
-                self._bounce(*min_score_data)
+        # collision logic with most suitable line object
+        if min_score_data:
+            self._bounce(*min_score_data)
 
     def _exit_tile(self, sprite, direction):
         # move player out of tile
 
-        if direction == 'horizontal':
+        if direction == Direction.HORIZONTAL:
             player_hitbox = shapely.geometry.Point(self.x, self.y).buffer(self.radius)
             if self.velocity.magnitude() != 0:
                 if self.velocity.x > 0:
@@ -170,5 +167,4 @@ class Player(pygame.sprite.Sprite):
         self.velocity = pygame.Vector2(dx, dy)
 
     def update(self):
-        # self._draw()
         self._move()
