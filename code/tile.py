@@ -134,7 +134,7 @@ class Tile(pygame.sprite.Sprite):
 
     def _get_hitboxes(self):
         self.hitbox = shapely.geometry.Polygon(self.real_coord_list)
-        self.hitbox_list = [LineHitbox(i[0], i[1], self.pos) for i in self.line_data_list]
+        self.line_list = [LineHitbox(i[0], i[1], self.pos) for i in self.line_data_list]
 
 
 class Platform(Tile):
@@ -146,3 +146,4 @@ class Platform(Tile):
 
     def _get_hitboxes(self):
         self.line = LineHitbox((self.line_data_list[0], self.line_data_list[1]), 0, self.pos)
+        self.line_list = [self.line]
