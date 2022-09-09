@@ -1,12 +1,12 @@
 from helper import import_csv_layout
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, auto
 
 
 class Map(Enum):
-    collision = 0
-    platform = 1
-    player = 2
+    collision = auto()
+    platform = auto()
+    player = auto()
 
 
 @dataclass

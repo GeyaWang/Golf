@@ -5,16 +5,19 @@ from level import Level
 
 
 class Game:
-    def __init__(self):
+    def __init__(self) -> None:
+        # general setup
         pygame.init()
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        self.clock = pygame.time.Clock()
+
         pygame.display.set_caption('Epic GAME!!!')
         pygame.mouse.set_visible(False)
-        self.clock = pygame.time.Clock()
 
         self.level = Level()
 
-    def run(self):
+    def run(self) -> None:
+        """Game loop."""
         while True:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT or pygame.key.get_pressed()[pygame.K_q]:

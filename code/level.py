@@ -4,25 +4,25 @@ from player import Player
 from cursor import Cursor
 from settings import WIDTH, HEIGHT, TILE_SIZE
 from game_data import LevelData, Map
-from math import sqrt, copysign
+from math import copysign
 
 
 class Level:
-    def __init__(self):
+    def __init__(self) -> None:
         self.display_surf = pygame.display.get_surface()
         self.visible_sprites = CameraGroup()
         self.obstacle_sprites = pygame.sprite.Group()
 
-        self.rel_width = WIDTH / TILE_SIZE
-        self.rel_height = HEIGHT / TILE_SIZE
+        self.level = 0
 
         self._create_map()
-        self.cursor = Cursor(self.player)
+        self.cursor: Cursor = Cursor(self.player)
         self._remove_overlap_hitbox()
 
-        self.background_surfs = [pygame.transform.scale(pygame.image.load(path).convert_alpha(), (WIDTH, HEIGHT)) for path in LevelData[0].backgrounds]
+        self.background_surfs = self._get_background_surfaces()
 
-    def _spawn_sprite(self, style, pos):
+    def _spawn_sprite(self, style: Map, pos: tuple) -> None:
+        """Find which sprite to place."""
         match style:
             case Map.collision:
                 Tile(pos, [self.obstacle_sprites], TileType.block, style)
@@ -31,7 +31,8 @@ class Level:
             case Map.player:
                 self.player = Player(pos, self.obstacle_sprites, self.visible_sprites)
 
-    def _create_map(self):
+    def _create_map(self) -> None:
+        """Iterate through maps and place sprites."""
         for style, layout in LevelData[0].map.items():
             for row_index, row in enumerate(layout):
                 for col_index, col in enumerate(row):
@@ -40,7 +41,8 @@ class Level:
                         y = row_index * TILE_SIZE
                         self._spawn_sprite(style, (x, y))
 
-    def _remove_overlap_hitbox(self):
+    def _remove_overlap_hitbox(self) -> None:
+        """Remove overlapping hitboxes for optimization."""
         for a in self.obstacle_sprites:
             for b in self.obstacle_sprites:
                 if a is not b:
@@ -56,13 +58,18 @@ class Level:
                                 del line_obj_b
                                 break
 
-    def run(self):
+    def _get_background_surfaces(self) -> list[pygame.Surface]:
+        """Return a list of instantiates images."""
+        return [pygame.transform.scale(pygame.image.load(path).convert_alpha(), (WIDTH, HEIGHT)) for path in LevelData[self.level].backgrounds]
+
+    def run(self) -> None:
+        """Draw sprites."""
         # background
         for surf in self.background_surfs:
             self.display_surf.blit(surf, (0, 0))
 
         # tile sprites
-        self.visible_sprites.custom_draw(self.player, self.obstacle_sprites)
+        self.visible_sprites.custom_draw(self.player)
 
         # foreground
         self.cursor.update()
@@ -70,7 +77,7 @@ class Level:
 
 
 class CameraGroup(pygame.sprite.Group):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
         self.display_surf = pygame.display.get_surface()
@@ -88,7 +95,8 @@ class CameraGroup(pygame.sprite.Group):
 
         self.camera_exponential_speed = 0.5
 
-    def custom_draw(self, player, test):
+    def custom_draw(self, player: Player) -> None:
+        """Draw sprites with camera offset."""
         # floor
         level_offset_pos = self.level_rect.topleft - self.offset
         self.display_surf.blit(self.level_surf, level_offset_pos)
