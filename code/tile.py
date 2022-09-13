@@ -11,15 +11,15 @@ Point = namedtuple('Point', 'x, y')
 TileData = namedtuple('TileData', 'rel_vertices, center')
 
 
+@dataclass
 class LineHitbox:
-    def __init__(self, coords: tuple, angle: float, tile_pos: tuple) -> None:
-        self.rel_coords = coords
-        self.angle = angle
-        self.tile_pos = tile_pos
+    rel_coords: tuple
+    angle: float
+    tile_pos: tuple
 
+    def __post_init__(self):
         self.coords = self._get_real_coords()
         self.normal_vect = self._get_normal_vect()
-
         self.hitbox = LineString(self.coords)
 
     def _get_real_coords(self) -> tuple:
@@ -32,12 +32,6 @@ class LineHitbox:
         x = sin(angle_rad)
         y = -cos(angle_rad)
         return pygame.Vector2(x, y).normalize()
-
-    def __repr__(self) -> str:
-        return 'LineHitbox(coords=%r, angle=%r)' % (self.rel_coords, self.angle)
-
-    def __str__(self) -> str:
-        return 'Coords: %s, Rel_Coords: %s, Angle: %s' % (self.coords, self.rel_coords, self.angle)
 
 
 @dataclass
@@ -68,12 +62,15 @@ class TileType:
         rel_vertices=(Point(1, 0), Point(1, 1), Point(0, 1)),
         center=Point(0.5, 0.5)
     )
+    terrain = TileData(
+        rel_vertices=(),
+        center=()
+    )
 
 
 class Tile(pygame.sprite.Sprite):
     def __init__(self, pos: tuple, group: list[pygame.sprite.Group], tile_data: TileData, tile_type: Map) -> None:
         super().__init__(group)
-
         self.rect = pygame.Rect(pos[0], pos[1], TILE_SIZE, TILE_SIZE)
         self.pos = pos
 
@@ -86,7 +83,7 @@ class Tile(pygame.sprite.Sprite):
         self.hitbox: Polygon = self._get_hitbox()
 
         self.friction = 0.1
-        self.bounciness = 0.3
+        self.bounciness = 0.5
 
     def _get_line_data_list(self) -> list[LineHitbox]:
         """Returns list with LineHitbox objects."""
@@ -144,9 +141,20 @@ class Tile(pygame.sprite.Sprite):
             return Polygon(self.real_coord_list)
 
 
+class Terrain(Tile):
+    def __init__(self, pos: tuple, group: list[pygame.sprite.Group], tile_type: Map, image: pygame.Surface):
+        super().__init__(pos, group, TileType.platform, tile_type)
+        self.image = image
+        self.rect = image.get_rect(topleft=pos)
+
+    def _get_line_data_list(self) -> None:
+        return
+
+
 class Platform(Tile):
     def __init__(self, pos: tuple, group: list[pygame.sprite.Group], tile_type: Map) -> None:
         super().__init__(pos, group, TileType.platform, tile_type)
+        self.y = pos[1]
 
     def _get_line_data_list(self) -> list[LineHitbox]:
         """Returns list with LineHitbox objects."""

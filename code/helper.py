@@ -1,4 +1,6 @@
 from csv import reader
+from settings import TILE_SIZE
+import pygame.image
 
 
 def import_csv_layout(path) -> list[list[str]]:
@@ -9,3 +11,19 @@ def import_csv_layout(path) -> list[list[str]]:
         for row in level:
             terrain_map.append(list(row))
     return terrain_map
+
+
+def import_cut_graphics(path) -> list[pygame.Surface]:
+    image = pygame.image.load(path).convert_alpha()
+    n_tiles_x = image.get_width() // TILE_SIZE
+    n_tiles_y = image.get_height() // TILE_SIZE
+
+    tiles = []
+    for row in range(n_tiles_y):
+        for col in range(n_tiles_x):
+            x = col * TILE_SIZE
+            y = row * TILE_SIZE
+
+            tile_img = image.subsurface((x, y, TILE_SIZE, TILE_SIZE))
+            tiles.append(tile_img)
+    return tiles

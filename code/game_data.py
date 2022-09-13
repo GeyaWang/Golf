@@ -4,6 +4,7 @@ from enum import Enum, auto
 
 
 class Map(Enum):
+    terrain = auto()
     collision = auto()
     platform = auto()
     player = auto()
@@ -16,12 +17,13 @@ class Data:
 
 
 Level0 = Data(
-    {
-        Map.collision: import_csv_layout('../graphics/level_0/tilemap/collision_map.csv'),
-        Map.platform: import_csv_layout('../graphics/level_0/tilemap/platform_map.csv'),
-        Map.player: import_csv_layout('../graphics/level_0/tilemap/player_spawn_map.csv')
+    map={
+        Map.terrain: import_csv_layout('../graphics/level_0/map/map_terrain.csv'),
+        Map.collision: import_csv_layout('../graphics/level_0/map/map_collision.csv'),
+        Map.platform: import_csv_layout('../graphics/level_0/map/map_platform.csv'),
+        Map.player: import_csv_layout('../graphics/level_0/map/map_player_spawn.csv')
     },
-    (
+    backgrounds=(
         '../graphics/level_0/images/background_0.png',
         '../graphics/level_0/images/background_1.png',
         '../graphics/level_0/images/background_2.png'
