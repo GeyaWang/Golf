@@ -1,11 +1,12 @@
 import pygame
 from math import copysign, sqrt
-from settings import GRAVITY, DELTA_TIME
+from settings import GRAVITY
 from game_data import Map
 import shapely.geometry
 from enum import Enum, auto
 from tile import LineHitbox
 from input import Mouse
+from timeit import default_timer
 
 
 class Direction(Enum):
@@ -37,9 +38,6 @@ class Player(pygame.sprite.Sprite):
         self.n_jumps = 0
         self.can_jump = False
         self.is_on_ground = False
-        self.i_frame_count = 0
-        self.i_frames = False
-        self.is_visible = False
 
         self._setup()
 
@@ -49,10 +47,7 @@ class Player(pygame.sprite.Sprite):
         self.roll_velocity = pygame.Vector2()
 
         self.can_jump = True
-        self.is_visible = True
         self.is_on_ground = False
-        self.i_frames = True
-        self.i_frame_count = 0
 
         self.rotation = 0
         self.rotation_vel = 0
@@ -145,7 +140,7 @@ class Player(pygame.sprite.Sprite):
                 self.y -= step.y
                 player_hitbox = self._get_hitbox()
 
-    def _draw_player(self) -> None:
+    def draw(self) -> None:
         """Draw a rotated sprite to the screen."""
         originPos = self.image.get_size()[0] / 2, self.image.get_size()[1] / 2
         image_rect = self.image.get_rect(topleft=(self.offset[0] - originPos[0], self.offset[1] - originPos[1]))
@@ -155,20 +150,6 @@ class Player(pygame.sprite.Sprite):
         rotated_image = pygame.transform.rotate(self.image, self.rotation)
         rotated_image_rect = rotated_image.get_rect(center=rotated_image_center)
         self.display_surf.blit(rotated_image, rotated_image_rect)
-
-    def draw(self) -> None:
-        """Logic to test if player should be drawn."""
-        if self.is_visible:
-            self._draw_player()
-
-        if self.i_frames and self.i_frame_count < 55:
-            self.i_frame_count += 1
-            if self.i_frame_count % 10 == 0:
-                self.is_visible = not self.is_visible
-        else:
-            self.i_frame_count = 0
-            self.i_frames = False
-            self.is_visible = True
 
     def kill(self) -> None:
         """Reset player completely."""
