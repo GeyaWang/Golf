@@ -6,7 +6,6 @@ import shapely.geometry
 from enum import Enum, auto
 from tile import LineHitbox
 from input import Mouse
-from timeit import default_timer
 
 
 class Direction(Enum):
@@ -21,7 +20,7 @@ class Player(pygame.sprite.Sprite):
         self.image = pygame.image.load('../graphics/player/ball.png').convert_alpha()
         self.rect = self.image.get_rect(midbottom=pos)
         self.radius = self.rect.width / 2
-        self.x, self.y = self.rect.center
+        self.pos = pygame.Vector2(self.rect.center)
         self.offset = pygame.Vector2()  # controlled by camera
         self.original_pos = pos
         self.mouse = mouse
@@ -58,15 +57,14 @@ class Player(pygame.sprite.Sprite):
         """Movement and collision logic."""
         # collision logic for x and y independently
         self.velocity.y += GRAVITY * delta_time
-        self.y += self.velocity.y * delta_time
-        self.x += self.velocity.x * delta_time
+        self.pos += self.velocity.x * delta_time, self.velocity.y * delta_time
         self._collision()
 
         self.rotation += self.rotation_vel
-        self.rect.center = self.x, self.y
+        self.rect.center = self.pos
 
     def _get_hitbox(self) -> shapely.geometry.Point:
-        return shapely.geometry.Point(self.x, self.y).buffer(self.radius)
+        return shapely.geometry.Point(self.pos).buffer(self.radius)
 
     def _collision(self) -> None:
         """Handle collision logic."""
@@ -79,7 +77,7 @@ class Player(pygame.sprite.Sprite):
             match sprite.type:
                 case Map.platform:
                     sprite_line = sprite.line_list[0]
-                    if self.velocity.y > 0 and player_hitbox.intersects(sprite_line.hitbox) and self.y + self.radius - self.velocity.y < sprite.y:
+                    if self.velocity.y > 0 and player_hitbox.intersects(sprite_line.hitbox) and self.pos.y + self.radius - self.velocity.y < sprite.y:
                         collision_sprites.append(sprite_line)
                         score = self._get_collision_score(sprite_line.normal_vect)
                         if score > max_score:
@@ -136,8 +134,7 @@ class Player(pygame.sprite.Sprite):
                 else:
                     # no collisions, exit
                     break
-                self.x -= step.x
-                self.y -= step.y
+                self.pos -= step.x, step.y
                 player_hitbox = self._get_hitbox()
 
     def draw(self) -> None:
@@ -153,7 +150,7 @@ class Player(pygame.sprite.Sprite):
 
     def kill(self) -> None:
         """Reset player completely."""
-        self.x, self.y = self.original_pos
+        self.pos.x, self.pos.y = self.original_pos
         self._setup()
 
     def reset_jumps(self) -> None:
