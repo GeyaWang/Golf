@@ -1,6 +1,10 @@
 from csv import reader
 from settings import TILE_SIZE
 import pygame.image
+from collections import namedtuple
+
+
+Point = namedtuple('Point', 'x, y')
 
 
 def import_csv_layout(path) -> list[list[str]]:
@@ -14,6 +18,7 @@ def import_csv_layout(path) -> list[list[str]]:
 
 
 def import_cut_graphics(path) -> list[pygame.Surface]:
+    """Returns a list of cut tiles from an image path."""
     image = pygame.image.load(path).convert_alpha()
     n_tiles_x = image.get_width() // TILE_SIZE
     n_tiles_y = image.get_height() // TILE_SIZE

@@ -1,55 +1,65 @@
 import pygame
 from settings import *
 from level import Level
-from input import Mouse
+from input import Input
 from threading import Thread
+from typing import Callable
 
 
 class Game:
+    """Control game processes."""
     def __init__(self) -> None:
         # general setup
         pygame.init()
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT), flags=pygame.SCALED, vsync=1)
         self.clock = pygame.time.Clock()
 
-        pygame.display.set_caption('Epic GAME!!!')
+        self.input = Input()
+        self.level = Level(self.input)
+
+        pygame.display.set_caption('Golf Game')
         pygame.mouse.set_visible(False)
 
-        self.mouse = Mouse()
-        self.level = Level(self.mouse)
-
         self.is_running = True
+        self.commands: dict[int: Callable] = {
+            pygame.K_q: self.stop,
+            pygame.K_h: self.level.toggle_hitboxes,
+        }
 
-    def _mouse_thread(self):
-        while self.is_running:
-            self.mouse.update()
-            self.clock.tick(150)
+    def stop(self) -> None:
+        self.is_running = False
 
-    def run(self) -> None:
+    def _run(self) -> None:
         """Game loop."""
+        while self.is_running:
+            event_list = pygame.event.get()
+            for event in event_list:
+                if event.type == pygame.QUIT:
+                    self.is_running = False
+                    return
+                if event.type == pygame.KEYDOWN:
+                    if event.key in self.commands:
+                        self.commands[event.key]()  # call function
 
-        # initiate mouse thread
-        mouse_thread = Thread(target=self._mouse_thread)
-        mouse_thread.start()
+            self.input.update(event_list)
 
+            self.screen.fill('Black')
+            self.level.run()
+            self.input.mouse.update()
+            pygame.display.flip()
+            self.clock.tick(FPS)
+
+    def start(self) -> None:
+        """Start game."""
         try:
-            while self.is_running:
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT or pygame.key.get_pressed()[pygame.K_q]:
-                        self.is_running = False
-
-                self.screen.fill('Black')
-                self.level.run()
-                pygame.display.flip()
-                self.clock.tick(FPS)
+            self._run()
         except KeyboardInterrupt:
             self.is_running = False
 
         # cleanup
-        mouse_thread.join()  # wait for thread to close
         pygame.quit()
 
 
 if __name__ == '__main__':
     game = Game()
-    game.run()
+    game.start()

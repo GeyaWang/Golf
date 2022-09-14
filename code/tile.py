@@ -5,26 +5,28 @@ from collections import namedtuple
 from dataclasses import dataclass
 from game_data import Map
 from shapely.geometry import LineString, Polygon
+from helper import Point
 
 
-Point = namedtuple('Point', 'x, y')
 TileData = namedtuple('TileData', 'rel_vertices, center')
 
 
 @dataclass
 class LineHitbox:
+    """Data-oriented class to contain line information."""
     rel_coords: tuple
     angle: float
     tile_pos: tuple
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        """Adds attributes post-init."""
         self.coords = self._get_real_coords()
         self.normal_vect = self._get_normal_vect()
         self.hitbox = LineString(self.coords)
 
-    def _get_real_coords(self) -> tuple:
+    def _get_real_coords(self) -> tuple[tuple[float, float]]:
         """Returns real coordinates from relative coordinates."""
-        return tuple((i[0] * TILE_SIZE + self.tile_pos[0], i[1] * TILE_SIZE + self.tile_pos[1]) for i in self.rel_coords)
+        return tuple((float(i[0] * TILE_SIZE + self.tile_pos[0]), float(i[1] * TILE_SIZE + self.tile_pos[1])) for i in self.rel_coords)
 
     def _get_normal_vect(self) -> pygame.Vector2:
         """Returns normalized normal vector from line angle."""
@@ -36,8 +38,7 @@ class LineHitbox:
 
 @dataclass
 class TileType:
-    """Defines tile by vertexes and centre."""
-    # No convex angles
+    """Defines tile by vertexes and centre. All angles must be convex"""
     block = TileData(
         rel_vertices=(Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1)),
         center=Point(0.5, 0.5)
@@ -45,7 +46,7 @@ class TileType:
     platform = TileData(
         rel_vertices=(Point(0, 0), Point(1, 0)),
         center=Point(0.5, 0)
-    )
+    )  # rel_vertices must be completely flat
     slope0 = TileData(
         rel_vertices=(Point(0, 0), Point(1, 1), Point(0, 1)),
         center=Point(0.5, 0.5)
@@ -65,10 +66,11 @@ class TileType:
     terrain = TileData(
         rel_vertices=(),
         center=()
-    )
+    )  # no hitbox
 
 
 class Tile(pygame.sprite.Sprite):
+    """Controls tile functions."""
     def __init__(self, pos: tuple, group: list[pygame.sprite.Group], tile_data: TileData, tile_type: Map) -> None:
         super().__init__(group)
         self.rect = pygame.Rect(pos[0], pos[1], TILE_SIZE, TILE_SIZE)
@@ -142,7 +144,8 @@ class Tile(pygame.sprite.Sprite):
 
 
 class Terrain(Tile):
-    def __init__(self, pos: tuple, group: list[pygame.sprite.Group], tile_type: Map, image: pygame.Surface):
+    """Child class of Tile. Contains an image surface and no hitbox."""
+    def __init__(self, pos: tuple, group: list[pygame.sprite.Group], tile_type: Map, image: pygame.Surface) -> None:
         super().__init__(pos, group, TileType.platform, tile_type)
         self.image = image
         self.rect = image.get_rect(topleft=pos)
@@ -152,6 +155,7 @@ class Terrain(Tile):
 
 
 class Platform(Tile):
+    """Child class of Tile. Contains a single LineHitbox object and a y value."""
     def __init__(self, pos: tuple, group: list[pygame.sprite.Group], tile_type: Map) -> None:
         super().__init__(pos, group, TileType.platform, tile_type)
         self.y = pos[1]

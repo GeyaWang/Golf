@@ -5,7 +5,7 @@ from game_data import Map
 import shapely.geometry
 from enum import Enum, auto
 from tile import LineHitbox
-from input import Mouse
+from input import Input
 
 
 class Direction(Enum):
@@ -14,24 +14,25 @@ class Direction(Enum):
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, pos: tuple, obstacle_sprites: pygame.sprite.Group, visible_sprites: pygame.sprite.Group, mouse: Mouse) -> None:
+    """Controls all player functions."""
+    def __init__(self, pos: tuple, loaded_obstacle_sprites: pygame.sprite.Group, input_: Input) -> None:
         super().__init__()
-
         self.image = pygame.image.load('../graphics/player/ball.png').convert_alpha()
         self.rect = self.image.get_rect(midbottom=pos)
         self.radius = self.rect.width / 2
         self.pos = pygame.Vector2(self.rect.center)
         self.offset = pygame.Vector2()  # controlled by camera
         self.original_pos = pos
-        self.mouse = mouse
+        self.input = input_
 
-        self.obstacle_sprites = obstacle_sprites
-        self.visible_sprite = visible_sprites
+        # general setup
+        self.loaded_obstacle_sprites = loaded_obstacle_sprites
         self.display_surf = pygame.display.get_surface()
 
+        # player attributes
         self.speed = 0.3
         self.default_jumps = 2
-        self.shoot_multiplier = 75
+        self.shoot_multiplier = 60
 
         self.velocity = pygame.Vector2()
         self.n_jumps = 0
@@ -55,29 +56,40 @@ class Player(pygame.sprite.Sprite):
 
     def _move(self, delta_time) -> None:
         """Movement and collision logic."""
-        # collision logic for x and y independently
-        self.velocity.y += GRAVITY * delta_time
-        self.pos += self.velocity.x * delta_time, self.velocity.y * delta_time
-        self._collision()
+        if self.loaded_obstacle_sprites.sprites():
+            # collision logic for x and y independently
+            self.velocity.y += GRAVITY * delta_time
+            self.pos += self.velocity.x * delta_time, self.velocity.y * delta_time
+            self._collision(delta_time)
 
-        self.rotation += self.rotation_vel
-        self.rect.center = self.pos
+            self.rotation += self.rotation_vel
+            self.rect.center = self.pos
 
     def _get_hitbox(self) -> shapely.geometry.Point:
         return shapely.geometry.Point(self.pos).buffer(self.radius)
 
-    def _collision(self) -> None:
+    def _collision_fix(self, delta_time: float) -> None:
+        """Handles if player collides with tile hitbox but not any line hitboxes."""
+        # move back and then move forwards with a small stem
+        if self.velocity.magnitude() * delta_time > 0.01:
+            rel_step = 10
+            self._move(-delta_time)
+            new_delta_time = delta_time / rel_step
+            for _ in range(rel_step):
+                self._move(new_delta_time)
+
+    def _collision(self, delta_time: float) -> None:
         """Handle collision logic."""
         player_hitbox = self._get_hitbox()
         collision_sprites = []
         max_score = 0
         max_score_data = ()  # (sprite, line)
 
-        for sprite in self.obstacle_sprites:
+        for sprite in self.loaded_obstacle_sprites:
             match sprite.type:
                 case Map.platform:
                     sprite_line = sprite.line_list[0]
-                    if self.velocity.y > 0 and player_hitbox.intersects(sprite_line.hitbox) and self.pos.y + self.radius - self.velocity.y < sprite.y:
+                    if self.velocity.y > 0 and player_hitbox.intersects(sprite_line.hitbox) and self.pos.y + self.radius - self.velocity.y * delta_time < sprite.y:
                         collision_sprites.append(sprite_line)
                         score = self._get_collision_score(sprite_line.normal_vect)
                         if score > max_score:
@@ -92,6 +104,9 @@ class Player(pygame.sprite.Sprite):
                                 if score > max_score:
                                     max_score = score
                                     max_score_data = (sprite, line)
+
+        if collision_sprites and not max_score_data:
+            self._collision_fix(delta_time)
 
         self._exit_tile(collision_sprites)
         if max_score_data:
@@ -127,13 +142,14 @@ class Player(pygame.sprite.Sprite):
         if self.velocity.magnitude() != 0 and sprites:
             step = self.velocity.normalize()
             while True:
+                collision = False
                 for sprite in sprites:
                     if player_hitbox.intersects(sprite.hitbox):
-                        # at least 1 collision, continue
+                        collision = True
                         break
-                else:
-                    # no collisions, exit
+                if not collision:
                     break
+
                 self.pos -= step.x, step.y
                 player_hitbox = self._get_hitbox()
 
@@ -164,12 +180,12 @@ class Player(pygame.sprite.Sprite):
         self.can_jump = False
 
         # Set velocity by mouse position
-        dx = (self.mouse.pos.x - self.offset.x)
+        dx = (self.input.mouse.pos.x - self.offset.x)
         dx = sqrt(abs(dx)) * copysign(1, dx)
-        dy = (self.mouse.pos.y - self.offset.y)
+        dy = (self.input.mouse.pos.y - self.offset.y)
         dy = sqrt(abs(dy)) * copysign(1, dy)
         self.velocity = pygame.Vector2(dx, dy) * self.shoot_multiplier
 
-    def update(self, deltatime) -> None:
+    def update(self, delta_time) -> None:
         """Handle player actions per frame."""
-        self._move(deltatime)
+        self._move(delta_time)
