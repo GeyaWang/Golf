@@ -4,9 +4,12 @@ from enum import Enum, auto
 
 
 class Map(Enum):
-    terrain = auto()
-    collision = auto()
-    platform = auto()
+    wall = auto()
+    terrain0 = auto()
+    terrain1 = auto()
+    block_collision = auto()
+    slope_collision = auto()
+    platform_collision = auto()
     player = auto()
 
 
@@ -20,15 +23,20 @@ class Data:
 class GameData:
     level0 = Data(
         map={
-            Map.terrain: import_csv_layout('../graphics/level_0/map/map_terrain.csv'),
-            Map.collision: import_csv_layout('../graphics/level_0/map/map_collision.csv'),
-            Map.platform: import_csv_layout('../graphics/level_0/map/map_platform.csv'),
-            Map.player: import_csv_layout('../graphics/level_0/map/map_player_spawn.csv')
+            # order of drawing (top=first, bottom=last)
+            Map.wall: import_csv_layout('../graphics/levels/level0/map/map_wall.csv'),
+            Map.terrain0: import_csv_layout('../graphics/levels/level0/map/map_terrain0.csv'),
+            Map.terrain1: import_csv_layout('../graphics/levels/level0/map/map_terrain1.csv'),
+
+            Map.block_collision: import_csv_layout('../graphics/levels/level0/map/map_block_collision.csv'),
+            Map.slope_collision: import_csv_layout('../graphics/levels/level0/map/map_slope_collision.csv'),
+            Map.platform_collision: import_csv_layout('../graphics/levels/level0/map/map_platform_collision.csv'),
+            Map.player: import_csv_layout('../graphics/levels/level0/map/map_player_spawn.csv')
         },
         backgrounds=(
-            '../graphics/level_0/images/background_0.png',
-            '../graphics/level_0/images/background_1.png',
-            '../graphics/level_0/images/background_2.png'
+            '../graphics/levels/level0/images/background_0.png',
+            '../graphics/levels/level0/images/background_1.png',
+            '../graphics/levels/level0/images/background_2.png'
         )
     )
     level_data_dict = {

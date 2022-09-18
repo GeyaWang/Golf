@@ -8,7 +8,7 @@ from shapely.geometry import LineString, Polygon
 from helper import Point
 
 
-TileData = namedtuple('TileData', 'rel_vertices, center')
+TileData = namedtuple('TileData', 'rel_vertices, center, bounciness')
 
 
 @dataclass
@@ -41,31 +41,41 @@ class TileType:
     """Defines tile by vertexes and centre. All angles must be convex"""
     block = TileData(
         rel_vertices=(Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1)),
-        center=Point(0.5, 0.5)
+        center=Point(0.5, 0.5),
+        bounciness=0.5
     )
     platform = TileData(
         rel_vertices=(Point(0, 0), Point(1, 0)),
-        center=Point(0.5, 0)
+        center=Point(0.5, 0),
+        bounciness=0
     )  # rel_vertices must be completely flat
+
     slope0 = TileData(
         rel_vertices=(Point(0, 0), Point(1, 1), Point(0, 1)),
-        center=Point(0.5, 0.5)
+        center=Point(0.5, 0.5),
+        bounciness=0.8
     )
     slope1 = TileData(
         rel_vertices=(Point(0, 0), Point(1, 0), Point(0, 1)),
-        center=Point(0.5, 0.5)
+        center=Point(0.5, 0.5),
+        bounciness=0.8
     )
     slope2 = TileData(
         rel_vertices=(Point(0, 0), Point(1, 0), Point(1, 1)),
-        center=Point(0.5, 0.5)
+        center=Point(0.5, 0.5),
+        bounciness=0.8
     )
     slope3 = TileData(
         rel_vertices=(Point(1, 0), Point(1, 1), Point(0, 1)),
-        center=Point(0.5, 0.5)
+        center=Point(0.5, 0.5),
+        bounciness=0.8
     )
+    slope_dict = {0: slope0, 1: slope1, 2: slope2, 3: slope3}
+
     terrain = TileData(
-        rel_vertices=(),
-        center=()
+        rel_vertices=None,
+        center=None,
+        bounciness=None
     )  # no hitbox
 
 
@@ -73,19 +83,18 @@ class Tile(pygame.sprite.Sprite):
     """Controls tile functions."""
     def __init__(self, pos: tuple, group: list[pygame.sprite.Group], tile_data: TileData, tile_type: Map) -> None:
         super().__init__(group)
-        self.rect = pygame.Rect(pos[0], pos[1], TILE_SIZE, TILE_SIZE)
         self.pos = pos
 
+        # get attributes
         self.type = tile_type
         self.rel_vertices = tile_data.rel_vertices
         self.center = tile_data.center
         self.real_coord_list = [(i.x * TILE_SIZE + pos[0], i.y * TILE_SIZE + pos[1]) for i in self.rel_vertices]
+        self.bounciness = tile_data.bounciness
 
+        # get hitbox
         self.line_list = self._get_line_data_list()
-        self.hitbox: Polygon = self._get_hitbox()
-
-        self.friction = 0.1
-        self.bounciness = 0.5
+        self.hitbox = self._get_hitbox()
 
     def _get_line_data_list(self) -> list[LineHitbox]:
         """Returns list with LineHitbox objects."""
@@ -159,6 +168,9 @@ class Platform(Tile):
     def __init__(self, pos: tuple, group: list[pygame.sprite.Group], tile_type: Map) -> None:
         super().__init__(pos, group, TileType.platform, tile_type)
         self.y = pos[1]
+
+    def _get_hitbox(self) -> LineString:
+        return self.line_list[0].hitbox
 
     def _get_line_data_list(self) -> list[LineHitbox]:
         """Returns list with LineHitbox objects."""
