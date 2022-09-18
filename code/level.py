@@ -18,6 +18,16 @@ class Level:
         self.level_data = GameData.level_data_dict
         self.level = 0
 
+        # loading screen
+        self.loading_status = ""
+        self.loading_progress = 0
+        self.loading_total_work = (
+            10  # import cut graphics
+            + len(self.level_data[self.level].map[Map.terrain0]) * len((self.level_data[self.level].map[Map.terrain0])[0]) * 7  # build map
+            + self._get_n_hitboxes() * 15  # remove overlap hitboxes
+            + 1  # set player attribute
+        )
+
         # sprite groups
         self.display_surf = pygame.display.get_surface()
         self.obstacle_sprites = pygame.sprite.Group()
@@ -26,15 +36,38 @@ class Level:
         self.visible_sprites = SpriteCameraGroup()
         self.camera = Camera(map_height, self.visible_sprites, self.loaded_obstacle_sprites, self.obstacle_sprites, self)
 
-        # create level
-        self._import_cut_graphics()
-        self._create_map()
-        self._remove_overlap_hitbox()
-
-        self.camera.player = self.player  # set player attribute in camera object
-
         # get background images
         self.background_surfs = self._get_background_surfaces()
+
+    def loading(self):
+        """Time-heavy processes to be done on loading screen."""
+        # create level
+        self.loading_status = "Importing graphics..."
+        self._import_cut_graphics()
+        self.loading_progress += 10
+
+        self.loading_status = "Building map..."
+        self._create_map()
+
+        self.loading_status = "Optimising hitboxes..."
+        self._remove_overlap_hitbox()
+
+        self.loading_status = "Creating player..."
+        self.camera.player = self.player  # set player attribute in camera object
+        self.loading_progress += 1
+
+        self.loading_status = "Done."
+
+    def _get_n_hitboxes(self) -> int:
+        n = 0
+        for style, layout in self.level_data[self.level].map.items():
+            match style:
+                case Map.block_collision | Map.slope_collision | Map.platform_collision:
+                    for row_index, row in enumerate(layout):
+                        for col_index, col in enumerate(row):
+                            if col != '-1':
+                                n += 1
+        return n
 
     def _import_cut_graphics(self) -> None:
         self.cut_tile_list = import_cut_graphics('../graphics/levels/level0/images/tileset.png')
@@ -77,6 +110,7 @@ class Level:
         for style, layout in self.level_data[self.level].map.items():
             for row_index, row in enumerate(layout):
                 for col_index, col in enumerate(row):
+                    self.loading_progress += 1
                     if col != '-1':
                         x = col_index * TILE_SIZE
                         y = row_index * TILE_SIZE
@@ -85,6 +119,7 @@ class Level:
     def _remove_overlap_hitbox(self) -> None:
         """Remove overlapping hitboxes for optimization."""
         for a in self.obstacle_sprites:
+            self.loading_progress += 15
             for b in self.obstacle_sprites:
                 if a is not b:
                     list_a = a.line_list.copy()

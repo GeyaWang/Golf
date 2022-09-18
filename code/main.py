@@ -1,9 +1,12 @@
+import sys
 import pygame
 from settings import *
 from level import Level
 from input import Input
 from typing import Callable
 from cursor import Cursor
+from loading_screen import LoadingScreen
+from threading import Thread
 
 
 class Game:
@@ -15,18 +18,16 @@ class Game:
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT), flags=flags, vsync=1)
         self.clock = pygame.time.Clock()
         pygame.display.set_caption('Golf Game')
-        pygame.event.set_grab(True)
 
         # split player calculations into chunks
         frame_chunks = 1
         chunk_deltatime = (1 / FPS) / frame_chunks
 
-        # create classes
         self.input = Input()
-        self.level = Level(self.input, frame_chunks, chunk_deltatime)
-        self.cursor = Cursor(self.level.player, self.input)
+        self.cursor = Cursor(self.input)
         pygame.mouse.set_cursor(self.cursor)
-        self.player = self.level.player
+        self.level = Level(self.input, frame_chunks, chunk_deltatime)
+        self.loading_screen = LoadingScreen(self.level)
 
         self.is_running = True
         self.commands: dict[int: Callable] = {
@@ -46,8 +47,8 @@ class Game:
             event_list = pygame.event.get()
             for event in event_list:
                 if event.type == pygame.QUIT:
-                    self.is_running = False
-                    return
+                    pygame.quit()
+                    sys.exit()
                 if event.type == pygame.KEYDOWN:
                     if event.key in self.commands:
                         self.commands[event.key]()  # call function
@@ -62,12 +63,24 @@ class Game:
             pygame.display.flip()
             self.clock.tick(FPS)
 
+    def _load(self):
+        """Load game objects."""
+        # start loading thread
+        load_thread = Thread(target=self.level.loading)
+        load_thread.start()
+
+        # show loading screen
+        self.loading_screen.run()
+
+        # setup once loading is finished
+        self.player = self.level.player
+        self.cursor.player = self.player
+        pygame.event.set_grab(True)
+
     def start(self) -> None:
         """Start game."""
-        try:
-            self._run()
-        except KeyboardInterrupt:
-            self.is_running = False
+        self._load()
+        self._run()
 
         # cleanup
         pygame.quit()

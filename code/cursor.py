@@ -4,8 +4,7 @@ from input import Input
 
 
 class Cursor(pygame.cursors.Cursor):
-    def __init__(self, player: Player, input_: Input, surf=None) -> None:
-        self.player = player
+    def __init__(self, input_: Input) -> None:
         self.input = input_
 
         self.cursor_default = pygame.image.load('../graphics/cursor/cursor_default.png').convert_alpha()
@@ -18,11 +17,10 @@ class Cursor(pygame.cursors.Cursor):
 
         self.locked = False
         self.line_thickness = 5
+        self.player = None
 
         self.hotspot = (self.half_width, self.half_width)
-        if surf is None:
-            surf = self.cursor_default
-        super().__init__(self.hotspot, surf)
+        super().__init__(self.hotspot, self.cursor_default)
 
     def _get_cursor_image(self) -> None:
         if self.locked:
@@ -70,6 +68,7 @@ class Cursor(pygame.cursors.Cursor):
             )
 
     def update(self) -> None:
-        self._input()
-        self._draw_line()
-        self._get_cursor_image()
+        if self.player is not None:
+            self._input()
+            self._draw_line()
+            self._get_cursor_image()
