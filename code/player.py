@@ -20,9 +20,8 @@ class Player(pygame.sprite.Sprite):
         self.image = pygame.image.load('../graphics/player/ball.png').convert_alpha()
         self.rect = self.image.get_rect(midbottom=pos)
         self.radius = self.rect.width / 2
-        self.pos = pygame.Vector2(self.rect.center)
-        self.offset = pygame.Vector2()  # controlled by camera
-        self.original_pos = pos
+        self.original_pos = self.rect.center
+        self.pos = pygame.Vector2(self.original_pos)
         self.input = input_
 
         # general setup
@@ -37,6 +36,8 @@ class Player(pygame.sprite.Sprite):
         self.shoot_multiplier = 60
         self.mass = 1
 
+        self.offset = pygame.Vector2()  # controlled by camera
+        self.prev_pos = pygame.Vector2()
         self.velocity = pygame.Vector2()
         self.roll_velocity = pygame.Vector2()
         self.n_jumps = 0
@@ -60,28 +61,23 @@ class Player(pygame.sprite.Sprite):
 
     def _move(self, delta_time) -> None:
         """Movement and collision logic."""
-        # fall
-        self.velocity.y += self.mass * GRAVITY * delta_time
+        self.prev_pos.update(self.pos)  # save previous position
+        self.velocity.y += self.mass * GRAVITY * delta_time  # fall
 
         # move player
         self.pos += self.velocity * delta_time
         self.pos += self.roll_velocity * delta_time
         self.rotation += self.rotation_vel
 
-        # collision logic
-        self._collision(delta_time)
+        self._collision(delta_time)  # collision logic
+        self.death()  # check for death
+        self.rect.center = self.pos  # update sprite position
 
-        # check for death
-        self._death()
-
-        # update sprite position
-        self.rect.center = self.pos
-
-    def _death(self) -> None:
+    def death(self, force=False) -> None:
         # kill player if off-screen
-        if self.offset.y > self.screen_height and (self.offset.x < 0 or self.offset.x > self.screen_width):
+        if self.offset.y > self.screen_height and (self.offset.x < 0 or self.offset.x > self.screen_width) or force:
             # reset everything
-            self.pos.x, self.pos.y = self.original_pos
+            self.pos.update(self.original_pos)
             self._setup()
 
     def _get_hitbox(self) -> shapely.geometry.Point:
@@ -89,10 +85,10 @@ class Player(pygame.sprite.Sprite):
 
     def _collision(self, delta_time: float) -> None:
         """Handle collision logic."""
-        prev_pos = self.pos - ((self.velocity + self.roll_velocity) * delta_time)
+        # prev_pos = self.pos - ((self.velocity + self.roll_velocity) * delta_time)
 
         player_hitbox = self._get_hitbox()
-        trail_hitbox = shapely.geometry.LineString((self.pos, prev_pos))
+        trail_hitbox = shapely.geometry.LineString((self.pos, self.prev_pos))
 
         collision_sprites = []
         collision_lines = []
@@ -103,7 +99,8 @@ class Player(pygame.sprite.Sprite):
             match sprite.type:
                 case Map.platform_collision:
                     line = sprite.line_list[0]
-                    if self.velocity.y > 0 and (player_hitbox.intersects(line.hitbox) or trail_hitbox.intersects(line.hitbox)) and prev_pos.y + self.radius < sprite.y:
+
+                    if self.velocity.y > 0 and (player_hitbox.intersects(line.hitbox) or trail_hitbox.intersects(line.hitbox)) and self.prev_pos.y + self.radius < sprite.y:
                         collision_sprites.append(sprite)
                         collision_lines.append(line)
                         score = self._get_collision_score(line.normal_vect)
@@ -123,7 +120,7 @@ class Player(pygame.sprite.Sprite):
 
         if max_score_data:
             # collision logic
-            self._exit_tile(prev_pos, collision_sprites)
+            self._exit_tile(collision_sprites)
             self._bounce(delta_time, max_score_data[0], max_score_data[1], collision_lines)
             self._set_rotation_vel(delta_time)
         else:
@@ -153,16 +150,18 @@ class Player(pygame.sprite.Sprite):
 
         # test if on vertex of the line
         if len(lines) == 2:
-            for p in line.coords:
-                vect = self.pos - p
-                if vect.magnitude() < self.radius:
-                    # find angle
-                    is_flipped = True if vect.x < 0 else False
-                    angle = degrees(atan2(-vect.y, abs(vect.x)))
+            line_angle = lines[0].normal_vect.angle_to(lines[1].normal_vect)
+            if line_angle != 0:
+                for p in line.coords:
+                    vect = self.pos - p
+                    if vect.magnitude() < self.radius:
+                        # find angle
+                        is_flipped = True if vect.x < 0 else False
+                        angle = degrees(atan2(-vect.y, abs(vect.x)))
 
-                    # roll
-                    roll = True
-                    self._roll(delta_time, angle, is_flipped)
+                        # roll
+                        roll = True
+                        self._roll(delta_time, angle, is_flipped)
 
         if line.angle == 0 and not roll:
             # stick if flat surface
@@ -184,14 +183,14 @@ class Player(pygame.sprite.Sprite):
         angle = angle if angle > 0 else angle + 360  # make angle positive
         return 1 - abs(1 - (angle / 180))
 
-    def _exit_tile(self, prev_pos: pygame.Vector2, sprites: list[pygame.sprite.Sprite]) -> None:
+    def _exit_tile(self, sprites: list[pygame.sprite.Sprite]) -> None:
         """Move player out of tile sprites."""
         player_hitbox = self._get_hitbox()
         if self.velocity.magnitude() == 0 or not sprites:
             return
 
         n_steps = 10
-        high = prev_pos
+        high = self.prev_pos
         low = self.pos
 
         step = (high - low) / 2
@@ -242,8 +241,11 @@ class Player(pygame.sprite.Sprite):
                 copysign(sqrt(abs(dy)), dy)
             ) * self.shoot_multiplier
 
+    def draw(self) -> None:
+        """Draw player to display surface."""
+        self._draw()
+
     def update(self, chunks: int, delta_time: float) -> None:
         """Handle player actions per frame."""
         for _ in range(chunks):
             self._move(delta_time)
-        self._draw()

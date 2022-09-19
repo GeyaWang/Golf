@@ -52,7 +52,7 @@ class LoadingScreen:
                     pygame.quit()
                     sys.exit()
 
-            if self.level.loading_progress == self.level.loading_total_work:
+            if not self.level.is_loading:
                 break
 
             self.display_surf.fill(self.background_colour)

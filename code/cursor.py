@@ -1,6 +1,12 @@
 import pygame
-from player import Player
 from input import Input
+from enum import Enum, auto
+
+
+class CursorType(Enum):
+    DEFAULT = auto()
+    HOVER = auto()
+    LOCKED = auto()
 
 
 class Cursor(pygame.cursors.Cursor):
@@ -16,7 +22,6 @@ class Cursor(pygame.cursors.Cursor):
         self.rect = self.cursor_default.get_rect()
 
         self.locked = False
-        self.line_thickness = 5
         self.player = None
 
         self.hotspot = (self.half_width, self.half_width)
@@ -24,12 +29,12 @@ class Cursor(pygame.cursors.Cursor):
 
     def _get_cursor_image(self) -> None:
         if self.locked:
-            surf = self.cursor_locked
+            style = CursorType.LOCKED
         elif self.is_hover and self._is_player_can_jump():
-            surf = self.cursor_hover
+            style = CursorType.HOVER
         else:
-            surf = self.cursor_default
-        self.data = (self.hotspot, surf)
+            style = CursorType.DEFAULT
+        self.set_image(style)
 
     def _is_player_can_jump(self) -> bool:
         """Return logic if player can jump."""
@@ -56,19 +61,19 @@ class Cursor(pygame.cursors.Cursor):
                 self._shoot()
             self.locked = False
 
-    def _draw_line(self) -> None:
-        if self.locked:
-            # draw line
-            pygame.draw.line(
-                self.display_surf,
-                (255, 255, 255),
-                (self.input.mouse.pos.x, self.input.mouse.pos.y),
-                self.player.offset,
-                self.line_thickness
-            )
+    def set_image(self, style: CursorType):
+        match style:
+            case CursorType.DEFAULT:
+                surf = self.cursor_default
+            case CursorType.HOVER:
+                surf = self.cursor_hover
+            case CursorType.LOCKED:
+                surf = self.cursor_locked
+            case x:
+                raise ValueError(f"Invalid cursor type: {x}")
+        self.data = (self.hotspot, surf)
 
     def update(self) -> None:
         if self.player is not None:
             self._input()
-            self._draw_line()
             self._get_cursor_image()

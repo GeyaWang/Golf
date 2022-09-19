@@ -6,6 +6,7 @@ from game_data import Map, GameData
 from helper import import_cut_graphics
 from math import copysign, ceil
 from input import Input
+from itertools import combinations
 
 
 class Level:
@@ -24,9 +25,10 @@ class Level:
         self.loading_total_work = (
             10  # import cut graphics
             + len(self.level_data[self.level].map[Map.terrain0]) * len((self.level_data[self.level].map[Map.terrain0])[0]) * 7  # build map
-            + self._get_n_hitboxes() * 15  # remove overlap hitboxes
+            + (self._get_n_hitboxes() - 1) * self._get_n_hitboxes() / 2  # remove overlap hitboxes
             + 1  # set player attribute
         )
+        self.is_loading = True
 
         # sprite groups
         self.display_surf = pygame.display.get_surface()
@@ -57,6 +59,7 @@ class Level:
         self.loading_progress += 1
 
         self.loading_status = "Done."
+        self.is_loading = False
 
     def _get_n_hitboxes(self) -> int:
         n = 0
@@ -118,24 +121,22 @@ class Level:
 
     def _remove_overlap_hitbox(self) -> None:
         """Remove overlapping hitboxes for optimization."""
-        for a in self.obstacle_sprites:
-            self.loading_progress += 15
-            for b in self.obstacle_sprites:
-                if a is not b:
-                    list_a = a.line_list.copy()
-                    list_b = b.line_list.copy()
+        for a, b in combinations(self.obstacle_sprites, 2):
+            self.loading_progress += 1
+            list_a = a.line_list.copy()
+            list_b = b.line_list.copy()
 
-                    for line_obj_a in list_a:
-                        for line_obj_b in list_b:
-                            if set(line_obj_a.coords) == set(line_obj_b.coords):
-                                a.line_list.remove(line_obj_a)
-                                del line_obj_a
-                                b.line_list.remove(line_obj_b)
-                                del line_obj_b
-                                break
-
-                if not b.line_list:
-                    b.kill()
+            for line_a in list_a:
+                for line_b in list_b:
+                    if set(line_a.coords) == set(line_b.coords):
+                        a.line_list.remove(line_a)
+                        del line_a
+                        b.line_list.remove(line_b)
+                        del line_b
+                        break
+            # kill sprite if no line hitboxes
+            if not b.line_list:
+                b.kill()
             if not a.line_list:
                 a.kill()
 
@@ -156,13 +157,16 @@ class Level:
             if y2 < sprite.pos[1] < y1:
                 sprite.add(self.loaded_obstacle_sprites)
 
-    def run(self) -> None:
-        """Draw and update sprites."""
-        # background
+    def draw(self) -> None:
         for image in self.background_surfs:
             self.display_surf.blit(image, (0, 0))
-        self.camera.update()  # camera
-        self.player.update(self.frame_chunks, self.chunk_deltatime)  # player
+        self.camera.draw_sprites()
+        self.player.draw()
+
+    def update(self) -> None:
+        """Draw and update sprites."""
+        self.camera.update()
+        self.player.update(self.frame_chunks, self.chunk_deltatime)
 
 
 class SpriteCameraGroup(pygame.sprite.Group):
@@ -191,20 +195,20 @@ class Camera:
 
         # display setup
         self.display_surf = pygame.display.get_surface()
-        self.width = self.display_surf.get_width()
-        self.half_width = self.width // 2
-        self.height = self.display_surf.get_height()
-        self.half_height = self.height // 2
+        self.screen_width = self.display_surf.get_width()
+        self.screen_half_width = self.screen_width // 2
+        self.screen_height = self.display_surf.get_height()
+        self.screen_half_height = self.screen_height // 2
 
         # camera setup
         self.map_height = map_height
-        self.offset = pygame.Vector2((ceil(WIDTH / TILE_SIZE) * TILE_SIZE - WIDTH) / 2, self.map_height - self.height)
+        self.offset = pygame.Vector2((ceil(self.screen_width / TILE_SIZE) * TILE_SIZE - self.screen_width) / 2, self.map_height - self.screen_height)
 
         # camera attributes
         self.camera_exponential_speed = 0.5
-        self.follow_threshold_top = self.height * (2 / 3)
-        self.hitbox_range = self.height * 2
-        self.hitbox_detect_range = self.height // 4
+        self.follow_threshold_top = self.screen_height * (2 / 3)
+        self.hitbox_range = self.screen_height * 2
+        self.hitbox_detect_range = self.screen_height // 4
 
     def _set_hitbox_range(self) -> None:
         """Set hitbox ranges using player position."""
@@ -221,7 +225,7 @@ class Camera:
         )
 
     def draw_hitboxes(self) -> None:
-        """Draw hitboxes to display surface with camera offset"""
+        """Draw hitboxes to display surface with camera offset."""
         for sprite in self.loaded_obstacle_sprites:
             for line in sprite.line_list:
                 pygame.draw.line(
@@ -232,33 +236,35 @@ class Camera:
                 )
 
     def _move_camera(self) -> None:
-        """move camera to player if player is on ground or beneath threshold."""
-        if self.player.is_on_ground or self.player.offset.y > self.follow_threshold_top:
-            target_y = min(max(self.player.rect.centery - self.half_height, 0), self.map_height - self.height)
-            diff_y = target_y - self.offset.y
-            if abs(diff_y) > 1:
-                self.offset.y += int(abs(diff_y) ** self.camera_exponential_speed * copysign(1, diff_y))
+        """Move camera to player if player is on ground or beneath threshold."""
+        self.offset.y = min(max(self.player.rect.centery - self.screen_half_height, 0), self.map_height - self.screen_height)
+        # if self.player.is_on_ground or self.player.offset.y > self.follow_threshold_top:
+        #     target_y = min(max(self.player.rect.centery - self.half_height, 0), self.map_height - self.height)
+        #     diff_y = target_y - self.offset.y
+        #     self.offset.y += int(abs(diff_y) ** copysign(self.camera_exponential_speed, diff_y))
 
-    def update(self) -> None:
-        """Draw sprites, update camera position and hitbox positions"""
-        self._move_camera()
+    def draw_sprites(self) -> None:
+        """Draw sprite elements."""
         self.visible_sprites.custom_draw(self.offset)
-        self.player.offset = self.player.pos - self.offset
-
-        # init hitboxes after level is initialized
-        if not self.setup_init_hitboxes and self.obstacle_sprites.sprites():
-            self.setup_init_hitboxes = True
-            self._set_hitbox_range()
-            self._call_reload_hitboxes()
-
-        # if player goes above relative camera height, reload hitboxes
-        if self.player.pos.y > self.hitbox_detect_y1:
-            self._set_hitbox_range()
-            self._call_reload_hitboxes()
-        elif self.player.pos.y < self.hitbox_detect_y2:
-            self._set_hitbox_range()
-            self._call_reload_hitboxes()
-
-        # draw hitboxes
         if self.is_draw_hitboxes:
             self.draw_hitboxes()
+
+    def update(self) -> None:
+        """Update camera position and hitbox positions."""
+        if self.player is not None:
+            self._move_camera()
+            self.player.offset = self.player.pos - self.offset
+
+            # init hitboxes after level is initialized
+            if not self.setup_init_hitboxes and self.obstacle_sprites.sprites():
+                self.setup_init_hitboxes = True
+                self._set_hitbox_range()
+                self._call_reload_hitboxes()
+
+            # if player goes above relative camera height, reload hitboxes
+            if self.player.pos.y > self.hitbox_detect_y1:
+                self._set_hitbox_range()
+                self._call_reload_hitboxes()
+            elif self.player.pos.y < self.hitbox_detect_y2:
+                self._set_hitbox_range()
+                self._call_reload_hitboxes()

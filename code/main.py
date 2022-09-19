@@ -4,9 +4,10 @@ from settings import *
 from level import Level
 from input import Input
 from typing import Callable
-from cursor import Cursor
+from cursor import Cursor, CursorType
 from loading_screen import LoadingScreen
 from threading import Thread
+from menu import Menu
 
 
 class Game:
@@ -24,6 +25,7 @@ class Game:
         chunk_deltatime = (1 / FPS) / frame_chunks
 
         self.input = Input()
+        self.menu = Menu()
         self.cursor = Cursor(self.input)
         pygame.mouse.set_cursor(self.cursor)
         self.level = Level(self.input, frame_chunks, chunk_deltatime)
@@ -33,6 +35,7 @@ class Game:
         self.commands: dict[int: Callable] = {
             pygame.K_q: self.stop,
             pygame.K_h: self.toggle_hitboxes,
+            pygame.K_r: self.restart
         }
 
     def stop(self) -> None:
@@ -40,6 +43,9 @@ class Game:
 
     def toggle_hitboxes(self) -> None:
         self.level.camera.is_draw_hitboxes = not self.level.camera.is_draw_hitboxes
+
+    def restart(self) -> None:
+        self.player.death(force=True)
 
     def _run(self) -> None:
         """Game loop."""
@@ -56,9 +62,18 @@ class Game:
             self.screen.fill('Black')
 
             self.input.update(event_list)  # input
-            self.level.run()  # level
-            self.cursor.update()  # cursor
-            pygame.mouse.set_cursor(self.cursor)
+
+            if not self.input.is_paused:
+                self.cursor.update()  # cursor
+                pygame.mouse.set_cursor(self.cursor)
+                self.level.update()  # level
+
+            self.level.draw()
+
+            if self.input.is_paused:
+                self.cursor.set_image(CursorType.DEFAULT)
+                pygame.mouse.set_cursor(self.cursor)
+                self.menu.paused.draw()
 
             pygame.display.flip()
             self.clock.tick(FPS)
@@ -79,8 +94,11 @@ class Game:
 
     def start(self) -> None:
         """Start game."""
-        self._load()
-        self._run()
+        try:
+            self._load()
+            self._run()
+        except KeyboardInterrupt:
+            print('Interrupted by Ctrl+C')
 
         # cleanup
         pygame.quit()
